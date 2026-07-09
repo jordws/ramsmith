@@ -1,0 +1,59 @@
+import { renderToBuffer } from "@react-pdf/renderer";
+import React from "react";
+import { requireUser, UnauthorizedError } from "@/server/user";
+import { getDocument } from "@/server/documents";
+import { RamsDocument } from "@/lib/pdf/RamsDocument";
+import { formatDate } from "@/lib/utils";
+import type { DocumentContent } from "@/types";
+
+// @react-pdf needs the Node runtime (not edge).
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET(
+  _req: Request,
+  { params }: { params: { id: string } }
+) {
+  let userId: string;
+  try {
+    const user = await requireUser();
+    userId = user.id;
+  } catch (e) {
+    if (e instanceof UnauthorizedError)
+      return new Response("Not authenticated", { status: 401 });
+    throw e;
+  }
+
+  const doc = await getDocument(userId, params.id);
+  if (!doc) return new Response("Not found", { status: 404 });
+
+  const content: DocumentContent = {
+    hazards: doc.hazards as unknown as DocumentContent["hazards"],
+    loadPlan: doc.loadPlan as unknown as DocumentContent["loadPlan"],
+    methodSteps: doc.methodSteps as unknown as DocumentContent["methodSteps"],
+  };
+
+  const buffer = await renderToBuffer(
+    React.createElement(RamsDocument, {
+      ref: doc.ref,
+      title: doc.title,
+      eventName: doc.eventName,
+      venue: doc.venue,
+      client: doc.client,
+      siteDates: doc.siteDates,
+      preparedBy: doc.preparedBy,
+      company: doc.company,
+      status: doc.status,
+      createdAt: formatDate(doc.createdAt),
+      content,
+    })
+  );
+
+  return new Response(new Uint8Array(buffer), {
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="${doc.ref}.pdf"`,
+      "Cache-Control": "private, no-store",
+    },
+  });
+}

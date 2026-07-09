@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+  * {
+    @apply border-line;
+  }
+  ::selection {
+    background: #f4c20d;
+    color: #12151c;
+  }
+  :focus-visible {
+    outline: 2px solid #12151c;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
+  }
+  /* The signature hazard-stripe rule, used as a thin accent band. */
+  .hazard-rule {
+    height: 6px;
+    background-image: repeating-linear-gradient(
+      -45deg,
+      #f4c20d 0 14px,
+      #12151c 14px 28px
+    );
+  }
+  .label-mono {
+    @apply font-mono text-[11px] uppercase tracking-wider text-muted;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
