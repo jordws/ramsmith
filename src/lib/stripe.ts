@@ -9,7 +9,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
 
 // apiVersion is intentionally omitted so the SDK uses its pinned default,
 // which avoids coupling this file to a specific Stripe types release.
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder", {
   typescript: true,
   appInfo: { name: "RAMSmith" },
 });
