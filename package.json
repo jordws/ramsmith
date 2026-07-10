@@ -1,49 +1,58 @@
-{
-  "name": "ramsmith",
-  "version": "1.0.0",
-  "private": true,
-  "description": "RAMSmith — compliant RAMS & load plans for live event production, in minutes.",
-  "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
-    "start": "next start",
-    "lint": "next lint",
-    "postinstall": "prisma generate",
-    "db:push": "prisma db push",
-    "db:seed": "prisma db seed",
-    "db:studio": "prisma studio",
-    "stripe:listen": "stripe listen --forward-to localhost:3000/api/stripe/webhook"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
-  "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "@react-pdf/renderer": "^4.1.6",
-    "bcryptjs": "^2.4.3",
-    "clsx": "^2.1.1",
-    "next": "14.2.15",
-    "next-auth": "5.0.0-beta.22",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "stripe": "^17.4.0",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^20.16.11",
-    "@types/react": "^18.3.11",
-    "@types/react-dom": "^18.3.0",
-    "autoprefixer": "^10.4.20",
-    "eslint": "^8.57.1",
-    "eslint-config-next": "14.2.15",
-    "postcss": "^8.4.47",
-    "prisma": "^5.22.0",
-    "tailwindcss": "^3.4.14",
-    "tsx": "^4.19.1",
-    "typescript": "^5.6.3"
-  },
-  "engines": {
-    "node": ">=18.18.0"
+import { renderToBuffer } from "@react-pdf/renderer";
+import React from "react";
+import { requireUser, UnauthorizedError } from "@/server/user";
+import { getDocument } from "@/server/documents";
+import { RamsDocument } from "@/lib/pdf/RamsDocument";
+import { formatDate } from "@/lib/utils";
+import type { DocumentContent } from "@/types";
+
+// @react-pdf needs the Node runtime (not edge).
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export async function GET(
+  _req: Request,
+  { params }: { params: { id: string } }
+) {
+  let userId: string;
+  try {
+    const user = await requireUser();
+    userId = user.id;
+  } catch (e) {
+    if (e instanceof UnauthorizedError)
+      return new Response("Not authenticated", { status: 401 });
+    throw e;
   }
+
+  const doc = await getDocument(userId, params.id);
+  if (!doc) return new Response("Not found", { status: 404 });
+
+  const content: DocumentContent = {
+    hazards: doc.hazards as unknown as DocumentContent["hazards"],
+    methodSteps: doc.methodSteps as unknown as DocumentContent["methodSteps"],
+  };
+
+  const buffer = await renderToBuffer(
+    React.createElement(RamsDocument, {
+      ref: doc.ref,
+      title: doc.title,
+      eventName: doc.eventName,
+      venue: doc.venue,
+      client: doc.client,
+      siteDates: doc.siteDates,
+      preparedBy: doc.preparedBy,
+      company: doc.company,
+      status: doc.status,
+      createdAt: formatDate(doc.createdAt),
+      content,
+    })
+  );
+
+  return new Response(new Uint8Array(buffer), {
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="${doc.ref}.pdf"`,
+      "Cache-Control": "private, no-store",
+    },
+  });
 }
